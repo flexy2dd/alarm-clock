@@ -4,6 +4,8 @@
 import datetime
 import os
 import codecs
+import time
+import math
 
 from thirdparties.lib_oled96.lib_oled96 import ssd1306
 from smbus import SMBus
@@ -139,3 +141,19 @@ class screen():
       self.draw.bitmap((left, top), self.logoWifi100, fill=0)
     else:
       self.draw.bitmap((left, top), self.logoWifi0, fill=0)
+
+  def sleep(self, secondsWait = 5.0):
+    affStart=time.time()
+    milliseconds=float(secondsWait)*1000
+    totalWidth=self.screen.width
+    step=totalWidth/milliseconds
+    self.draw.rectangle((0, self.screen.height-1, totalWidth, self.screen.height-1), 0, 1)
+    while True:
+      #affCurrent=int(math.floor(time.time()-affStart))
+      affCurrent=time.time()-affStart
+      width=(affCurrent*step)*1000
+      self.draw.rectangle((0, self.screen.height-1, width, self.screen.height-1), 0, 0)
+      self.display()
+
+      if affCurrent>secondsWait:
+        break

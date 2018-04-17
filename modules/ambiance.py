@@ -14,55 +14,55 @@ from modules import constant
 import ConfigParser
 
 # ===========================================================================
-# alarm Class
+# ambiance Class
 # ===========================================================================
 
-class alarm():
+class ambiance():
 
-  alarmsConf = 'alarms.cfg'
+  ambianceConf = 'ambiance.cfg'
 
   def __init__(self):
-    self.alarmsFile = self.alarmsConf
-    self.alarmsList = self.getList(True)
+    self.ambianceFile = self.ambianceConf
+    self.ambianceList = self.getList(True)
     
   def getList(self, bOnlyEnable = False):
     
     data = {}
     
-    if os.path.isfile(self.alarmsFile):
-      alarms = ConfigParser.ConfigParser()
-      alarms.read(self.alarmsFile)
+    if os.path.isfile(self.ambianceFile):
+      ambiance = ConfigParser.ConfigParser()
+      ambiance.read(self.ambianceFile)
       
-      for section in alarms.sections():        
-        if alarms.has_option(section, 'time'):
+      for section in ambiance.sections():        
+        if ambiance.has_option(section, 'time'):
           
-          bEnable = alarms.getboolean(section, 'enable')
+          bEnable = ambiance.getboolean(section, 'enable')
           
           if (bOnlyEnable and not bEnable):
             continue
 
-          sDays = alarms.get(section, 'days')
-          sTime = alarms.get(section, 'time')
+          sDays = ambiance.get(section, 'days')
+          sTime = ambiance.get(section, 'time')
           
           data[section] = {} 
           data[section]['key']    = section
           data[section]['enable'] = bEnable
-          data[section]['name']   = alarms.get(section, 'name')
+          data[section]['name']   = ambiance.get(section, 'name')
           data[section]['time']   = sTime
           data[section]['days']   = string.split(sDays, ',')
 
     return data
 
   def disable(self, alarmKey):
-    alarm = ConfigParser.ConfigParser()
-    alarms.read(self.alarmsFile)
+    ambiance = ConfigParser.ConfigParser()
+    alarms.read(self.ambianceFile)
     
     if alarm.has_section(alarmKey):
       
       alarm.remove_section(alarmKey)
       alarm.setboolean(alarmKey, 'enable', 'false')
     
-      with open(self.alarmsFile, 'wb') as configfile:
+      with open(self.ambianceFile, 'wb') as configfile:
         alarm.write(configfile)
 
       return True
@@ -70,15 +70,15 @@ class alarm():
     return False
     
   def enable(self, alarmKey):    
-    alarm = ConfigParser.ConfigParser()
-    alarms.read(self.alarmsFile)
+    ambiance = ConfigParser.ConfigParser()
+    alarms.read(self.ambianceFile)
     
     if alarm.has_section(alarmKey):
       
       alarm.remove_section(alarmKey)
       alarm.setboolean(alarmKey, 'enable', 'true')
     
-      with open(self.alarmsFile, 'wb') as configfile:
+      with open(self.ambianceFile, 'wb') as configfile:
         alarm.write(configfile)
 
       return True
@@ -86,14 +86,14 @@ class alarm():
     return False
     
   def delete(self, alarmKey):    
-    alarm = ConfigParser.ConfigParser()
-    alarms.read(self.alarmsFile)
+    ambiance = ConfigParser.ConfigParser()
+    alarms.read(self.ambianceFile)
     
     if alarm.has_section(alarmKey):
       
       alarm.remove_section(alarmKey)
       
-      with open(self.alarmsFile, 'wb') as configfile:
+      with open(self.ambianceFile, 'wb') as configfile:
         alarm.write(configfile)
         
       return True
@@ -118,7 +118,7 @@ class alarm():
     alarm.set(alarmKey, 'name', sName)
     alarm.set(alarmKey, 'enable', bEnable)
     
-    with open(self.alarmsFile, 'wb') as configfile:
+    with open(self.ambianceFile, 'wb') as configfile:
       alarm.write(configfile)
       
     return alarmKey
@@ -144,7 +144,7 @@ class alarm():
     
     if alarmKey != False: 
       alarm = ConfigParser.ConfigParser()
-      alarm.read(self.alarmsFile)
+      alarm.read(self.ambianceFile)
     
       soundFile = '%s/../sounds/alarm/%s' % (os.path.dirname(__file__), alarm.get(alarmKey, 'sound'))
       print('play ',soundFile)
@@ -160,7 +160,7 @@ class alarm():
           break
 
         oScreen.alarmPlay()
-        time.sleep(0.25)
+        time.sleep(0.05)
         
   def getKey(self, item):
     return item['time']
@@ -232,3 +232,65 @@ class alarm():
       break      
      
     oScreen.alarmInfos(isEnable, sNext)
+
+  def getAmbiance(self):
+    if os.path.isfile(self.ambianceConf):
+      ambiance = ConfigParser.ConfigParser()
+      ambiance.read(self.ambianceConf)
+  
+      if ambiance.has_option('general', 'title'):
+        generalTitle = ambiance.get('general', 'title')
+  
+      return ambiance
+  
+    return False
+
+  def setVolume(self, volume):
+    if os.path.isfile(self.ambianceConf):
+      ambiance = ConfigParser.ConfigParser()
+      ambiance.read(self.ambianceConf)
+
+      ambiance.set('general', 'volume', volume)
+    
+      with open(self.ambianceConf, 'wb') as configfile:
+        ambiance.write(configfile)
+
+      return True
+
+    return False;
+
+  def getVolume(self):
+    ambiance=self.getAmbiance()
+    return int(ambiance.get('general', 'volume'))
+
+  def setVolumeScreen(self, oScreen):
+    volume = self.getVolume()
+    oScreen.cls()
+    oScreen.setText(0, 10, "Volume: %s" % volume, 1)
+    oScreen.display()
+    while(True):
+      if not (GPIO.input(constant.GPIO_KEY_UP)): # down arrow
+        if volume <= 99:
+          volume += 1
+      elif not (GPIO.input(constant.GPIO_KEY_DOWN)): # up arrow
+        if volume >= 1:
+          volume -= 1
+
+      if not (GPIO.input(constant.GPIO_KEY_MENU)):
+        break
+
+      oScreen.cls()
+      oScreen.setText(0, 10, "Volume: %s" % volume, 1)
+      oScreen.display()
+      self.setVolume(volume)
+
+      time.sleep(0.05)
+      
+  def setSelectScreen(self, oScreen):
+    volume = self.getVolume()
+    oScreen.cls()
+    oScreen.setText(0, 10, "Volume: %s" % volume, 1)
+    oScreen.display()
+    while(True):
+      if not (GPIO.input(constant.GPIO_KEY_MENU)):
+        break

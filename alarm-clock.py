@@ -4,6 +4,7 @@
 import sys
 import os
 import re
+import signal
 import argparse
 import time
 import ConfigParser
@@ -19,12 +20,13 @@ from modules import menu
 from modules import screen
 from modules import constant
 from modules import alarm
+from modules import ambiance
 
 import RPi.GPIO as GPIO
 
 from PIL import ImageFont, ImageDraw, Image
 
-from thirdparties.adafruit.Adafruit_7Segment import SevenSegment
+#from thirdparties.adafruit.Adafruit_7Segment import SevenSegment
 from thirdparties.lib_oled96.lib_oled96 import ssd1306
 from smbus import SMBus
 
@@ -36,7 +38,7 @@ LOG_LEVEL = logging.INFO  # Could be e.g. "DEBUG" or "WARNING"
 
 parser = argparse.ArgumentParser(description="Alarm-clock service")
 parser.add_argument("-l", "--log", help="file to write log to (default '" + LOG_FILENAME + "')")
-parser.add_argument("-v", "--verbose", help="verbose mode", action='store_true')
+parser.add_argument("-v", "--verbose", help="verbose mode", action='store_false')
 parser.add_argument("-s", "--segments", help="view 7 segments clock", action='store_true')
 
 args = parser.parse_args()
@@ -65,19 +67,32 @@ if not args.verbose:
   sys.stdout = oLogger(logger, logging.INFO)
   sys.stderr = oLogger(logger, logging.ERROR)
 
+def signal_handler(signal, frame):
+  print('You pressed Ctrl+C!')
+  sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
 # ===========================================================================
 # Menu definition
 # ===========================================================================
 menu_data = {
-  'title': "Général", 'type': constant.MENU_MENU,
+  'title': "General", 'type': constant.MENU_MENU,
   'options':[
-    { 'title': "Réveil", 'type': constant.MENU_COMMAND, 'command': 'setAlarm' },
-    { 'title': "Ambiance", 'type': constant.MENU_COMMAND, 'command': 'setAmbiance' },
-    { 'title': "Paramètres", 'type': constant.MENU_MENU,
+#    { 'title': "Reveil", 'type': constant.MENU_COMMAND, 'command': 'setAlarm' },
+#    { 'title': "Ambiance", 'type': constant.MENU_COMMAND, 'command': 'setAmbiance' },
+    { 'title': "Ambiance", 'type': constant.MENU_MENU,
+      'options': [
+        { 'title': "Select", 'type': constant.MENU_COMMAND, 'command': 'setAmbiance' },
+        { 'title': "Volume", 'type': constant.MENU_COMMAND, 'command': 'setAmbianceVol' }
+#        { 'title': "Date", 'type': constant.MENU_COMMAND, 'command': 'setDate' },
+      ]
+    },
+    { 'title': "Parametres", 'type': constant.MENU_MENU,
       'options': [
         { 'title': "Informations", 'type': 'viewInfos'},
-        { 'title': "Heure", 'type': constant.MENU_COMMAND, 'command': 'setTime' },
-        { 'title': "Date", 'type': constant.MENU_COMMAND, 'command': 'setDate' },
+#        { 'title': "Heure", 'type': constant.MENU_COMMAND, 'command': 'setTime' },
+#        { 'title': "Date", 'type': constant.MENU_COMMAND, 'command': 'setDate' },
       ]
     },
   ]
@@ -86,8 +101,8 @@ menu_data = {
 # ===========================================================================
 # Clock 
 # ===========================================================================
-if args.segments:
-  clockSegment = SevenSegment(address=0x70)
+#if args.segments:
+#  clockSegment = SevenSegment(address=0x70)
 
 # ===========================================================================
 # Alarm
@@ -117,29 +132,34 @@ def clock():
     hour = now.hour
     minute = now.minute
     second = now.second
-    # Set hours
-    clockSegment.writeDigit(0, int(hour / 10))     # Tens
-    clockSegment.writeDigit(1, hour % 10)          # Ones
-    # Set minutes
-    clockSegment.writeDigit(3, int(minute / 10))   # Tens
-    clockSegment.writeDigit(4, minute % 10)        # Ones
-    # Toggle colon
-    clockSegment.setColon(second % 2)              # Toggle colon at 1Hz
+
+    #if args.segments:
+    #  # Set hours
+    #  clockSegment.writeDigit(0, int(hour / 10))     # Tens
+    #  clockSegment.writeDigit(1, hour % 10)          # Ones
+    #  # Set minutes
+    #  clockSegment.writeDigit(3, int(minute / 10))   # Tens
+    #  clockSegment.writeDigit(4, minute % 10)        # Ones
+    #  # Toggle colon
+    #  clockSegment.setColon(second % 2)              # Toggle colon at 1Hz
+
     # Wait a quarter second (less than 1 second to prevent colon blinking getting in phase with odd/even seconds).
-    time.sleep(0.25)
+    time.sleep(0.10)
 
 oScreen.debug('init clock')
 
-if args.segments:
-  clock()
+#if args.segments:
+#  clock()
 
 oScreen.debug("ip: %s" % network.get_lan_ip())
 
-# Continually update the time on a 4 char, 7-segment display
+oScreen.sleep(5.0)
+
+# Continually update the time
 while(True):
   try:
     if not (GPIO.input(constant.GPIO_KEY_MENU)):
-      print 'Menu'
+      oScreen.cls()
       menu.processmenu(oScreen, menu_data)
       oScreen.cls()
 
@@ -161,8 +181,8 @@ while(True):
     # refresh screen
     oScreen.display()
     
-    time.sleep(0.25)
+    time.sleep(0.10)
   except:
-    print "Unexpected error:", sys.exc_info()[0]
+#    print("Unexpected error:", sys.exc_info()[0])
     raise
     

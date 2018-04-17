@@ -2,6 +2,7 @@
 
 import sys
 import getopt
+import argparse
 import os
 import re
 import random
@@ -20,6 +21,7 @@ isVerbose = True
 ambiancePid = 'ambiance.pid'
 ambianceName = 'default'
 ambianceDuration = 5
+ambianceVolume = 50
 eventsDict = {}
 generalDeltaMin = 10
 generalDeltaMax = 20
@@ -31,37 +33,43 @@ generalTitle = ''
 def debug(message):
   global isVerbose
   if isVerbose:
-    print message
+    print(message)
 
 #
 # main
 #
 def main(argv):
-  global ambianceName, ambianceDuration
-  try:
-    opts, args = getopt.getopt(argv,"hdn:",["name="])
-  except getopt.GetoptError:
-    print 'run_ambiance.py -n <ambiance name> -d <duration in min>'
-    sys.exit(2)
-  for opt, arg in opts:
-    if opt == '-h':
-      print 'run_ambiance.py -n <ambiance name> -d <duration in min>'
-      sys.exit()
-    elif opt in ("-n", "--name"):
-      ambianceName = arg
-    elif opt in ("-d", "--duration"):
-      ambianceDuration = arg
+  global ambianceName, ambianceDuration, ambianceVolume
+
+  parser = argparse.ArgumentParser(description="Alarm-clock Ambiance service")
+  parser.add_argument("-v", "--verbose", help="verbose mode", action='store_true')
+  parser.add_argument("-n", "--ambiance", help="ambiance name (default '" + ambianceName + "')")
+  parser.add_argument("-d", "--duration", help="duration (in minutes)", type=int)
+  parser.add_argument("-V", "--volume", help="volume (0 > 100)", type=int)
+
+  args = parser.parse_args()
+
+  if args.duration:
+    ambianceDuration = args.duration
+
+  if args.ambiance:
+    ambianceName = args.ambiance
+
+  if args.volume:
+    ambianceVolume = args.volume
 
   now = datetime.datetime.now()
-  limit = now + datetime.timedelta(0, 0, 0, 0, ambianceDuration)
+  limit = now + datetime.timedelta(0, 0, 0, 0, int(ambianceDuration))
   unixTime = time.mktime(limit.timetuple())
   debug('Limit ' + limit.strftime("%Y-%m-%d %H:%M:%S") + ' (unixtime:' + str(unixTime) + ')')
+  debug('Volume:' + str(ambianceVolume))
 
   pidFile = ambiancePid
   pid = ConfigParser.ConfigParser()
   pid.add_section('general')
   pid.set('general', 'duration', str(ambianceDuration))
   pid.set('general', 'limit', unixTime)
+  pid.set('general', 'volume', ambianceVolume)
 
   with open(pidFile, 'wb') as configfile:
     pid.write(configfile)
@@ -90,7 +98,7 @@ def getAmbiance(name):
 
     return ambiance
 
-  print 'Ambiance nor found!'
+  print('Ambiance nor found!')
   sys.exit(2)
 
   return False
@@ -108,10 +116,12 @@ def playBackground(oAmbiance):
       if oAmbiance.has_option('background', 'loop'):
         loops = oAmbiance.getint('background', 'loop')
 
-      volume = 1.0
+      volume = 100.0
       if oAmbiance.has_option('background', 'volume'):
         volume = oAmbiance.getfloat('background', 'volume')
-        
+
+      volume = ((ambianceVolume * volume) / 100) / 100
+
       debug('play background ' + backgroundFile + ' (loops:' + str(loops) + ', volume:' + str(volume) + ')')
       background.set_volume(volume)
       background.play(loops)
@@ -130,13 +140,15 @@ def loadEvents(oAmbiance):
 
       if os.path.isfile(eventFile):
         oEvent = pygame.mixer.Sound(eventFile)
-        
-        volume = 1.0
+
+        volume = 100.0
         if oAmbiance.has_option(section, 'volume'):
           volume = oAmbiance.getfloat(section, 'volume')
-          
-        oEvent.set_volume(volume)
+
+        volume = ((ambianceVolume * volume) / 100) / 100
         
+        oEvent.set_volume(volume)
+
         eventsDict[eventIndex] = {'file' : eventFile, 'oEvent' : oEvent, 'duration' : oEvent.get_length(), 'volume' : volume}
         debug('..loaded (duration:' + str(oEvent.get_length()) + ', volume:' + str(volume) + ')')
         eventIndex += 1
@@ -157,7 +169,7 @@ if __name__ == "__main__":
   pygame.mixer.init();
   #freq, size, chan = pygame.mixer.get_init()
   #pygame.mixer.init(freq, size, chan, 3072)
-	
+
   # init and play background if exist
   playBackground(oAmbiance)
 
@@ -169,24 +181,27 @@ if __name__ == "__main__":
   debug('wait ' + str(eventDelta) + ' seconds for next event')
 
   if not os.path.isfile('ambience.pid'):
-  	debug('wait ' + str(eventDelta) + ' seconds for next event')
-  	
+    debug('wait ' + str(eventDelta) + ' seconds for next event')
+
   oAmbiencePid = ConfigParser.ConfigParser()
 
   while True:
-  	
+
     oAmbiencePid.read(ambiancePid)
     unixTimeLimit = oAmbiencePid.getfloat('general', 'limit')
     unixTimeNow = time.mktime(datetime.datetime.now().timetuple())
-    
+
     if unixTimeNow>unixTimeLimit:
-      debug('limit:' + str(unixTimeLimit))	
+      debug('limit:' + str(unixTimeLimit))
       debug('unixTimeNow:' + str(unixTimeNow))
+      pygame.mixer.music.fadeout(4000)
+      pygame.mixer.music.stop()
+      time.sleep(4.25)
       sys.exit(0)
 
     if eventCurrent==None and eventDelta==0:
       eventIndex = random.randint(0, len(eventsDict)-1)
-      
+
       eventDuration = eventsDict[eventIndex]['duration']
       oEvent = eventsDict[eventIndex]['oEvent']
       eventCurrent=oEvent.play()
@@ -196,7 +211,7 @@ if __name__ == "__main__":
       time.sleep(0.0)
     else:
       sys.stdout.write("%i \r" % (eventDelta))
-      
+
       eventCurrent=None
       if eventDelta<=0:
         eventDelta = random.randint(generalDeltaMin, generalDeltaMax)

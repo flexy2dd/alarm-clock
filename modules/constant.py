@@ -4,10 +4,10 @@
 # ===========================================================================
 # Constants
 # ===========================================================================
-GPIO_KEY_SNOOZE = 18
+GPIO_KEY_SNOOZE = 23
 GPIO_KEY_DOWN = 22
-GPIO_KEY_UP = 24
-GPIO_KEY_MENU = 26
+GPIO_KEY_UP = 26
+GPIO_KEY_MENU = 24
 
 GPIO_KEY_AMBIANCE = 0
 GPIO_KEY_TIME = 0

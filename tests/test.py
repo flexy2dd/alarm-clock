@@ -33,6 +33,6 @@ days = ['mon','tue','wed','thu','fri']
 while(True):
   alarmKey = oAlarm.isRun()
   if alarmKey <> False:
-    print alarmKey
+    print(alarmKey)
     
   time.sleep(0.25)
